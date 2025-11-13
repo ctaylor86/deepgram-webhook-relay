@@ -114,6 +114,86 @@ export default {
       }
     }
 
+    // POST /log - Store log entry
+    if (request.method === 'POST' && url.pathname === '/log') {
+      try {
+        const logEntry = await request.json();
+        const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const requestId = logEntry.request_id || logId;
+        
+        // Store log with 24-hour expiration
+        const logKey = `log:${requestId}:${logEntry.event}:${Date.now()}`;
+        await env.TRANSCRIPTS.put(logKey, JSON.stringify({
+          ...logEntry,
+          log_id: logId,
+          logged_at: new Date().toISOString(),
+        }), {
+          expirationTtl: 86400, // 24 hours
+        });
+
+        // Fire-and-forget response (don't wait)
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        // Don't fail the request if logging fails
+        console.error('Error storing log:', error);
+        return new Response(JSON.stringify({ success: false }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /logs/:request_id - Retrieve logs for a request
+    if (request.method === 'GET' && url.pathname.startsWith('/logs/')) {
+      try {
+        const requestId = url.pathname.split('/')[2];
+        
+        if (!requestId) {
+          return new Response(JSON.stringify({
+            error: 'Missing request_id in URL path',
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // List all keys matching this request_id
+        const list = await env.TRANSCRIPTS.list({ prefix: `log:${requestId}:` });
+        const logs = [];
+        
+        for (const key of list.keys) {
+          const data = await env.TRANSCRIPTS.get(key.name);
+          if (data) {
+            logs.push(JSON.parse(data));
+          }
+        }
+        
+        // Sort by timestamp
+        logs.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        return new Response(JSON.stringify({
+          request_id: requestId,
+          log_count: logs.length,
+          logs: logs,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('Error retrieving logs:', error);
+        return new Response(JSON.stringify({
+          error: 'Failed to retrieve logs',
+          details: error.message,
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // GET /health - Health check
     if (request.method === 'GET' && url.pathname === '/health') {
       return new Response(JSON.stringify({
