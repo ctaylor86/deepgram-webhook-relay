@@ -117,6 +117,17 @@ export default {
     // POST /log - Store log entry
     if (request.method === 'POST' && url.pathname === '/log') {
       try {
+        // Check if KV is available
+        if (!env.TRANSCRIPTS) {
+          return new Response(JSON.stringify({
+            error: 'KV namespace not configured',
+            message: 'TRANSCRIPTS binding is missing'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         const logEntry = await request.json();
         const logId = `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const requestId = logEntry.request_id || logId;
@@ -149,6 +160,17 @@ export default {
     // GET /logs/:request_id - Retrieve logs for a request
     if (request.method === 'GET' && url.pathname.startsWith('/logs/')) {
       try {
+        // Check if KV is available
+        if (!env.TRANSCRIPTS) {
+          return new Response(JSON.stringify({
+            error: 'KV namespace not configured',
+            message: 'TRANSCRIPTS binding is missing'
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
         const requestId = url.pathname.split('/')[2];
         
         if (!requestId) {
