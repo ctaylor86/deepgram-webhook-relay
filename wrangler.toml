@@ -1,0 +1,13 @@
+name = "deepgram-webhook-relay"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV namespace for storing transcripts
+[[kv_namespaces]]
+binding = "TRANSCRIPTS"
+id = "YOUR_KV_NAMESPACE_ID"  # Will be created during deployment
+
+[env.production]
+kv_namespaces = [
+  { binding = "TRANSCRIPTS", id = "YOUR_PRODUCTION_KV_ID" }
+]
